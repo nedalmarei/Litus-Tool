@@ -234,6 +234,7 @@ table.fmt.list td.lab{min-width:280px}.small{font-size:.8rem}.seg.mini button{pa
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .namechk{display:inline-flex;gap:6px;align-items:center;font-size:.85rem;color:var(--ink);cursor:pointer;margin-left:auto;white-space:nowrap}
 .scnbar .namechk{align-self:flex-end;margin:0 0 8px}
+.fmlink{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:0 0 12px}.fmlink label{font-weight:600;color:var(--head)}.fmlink select{min-width:260px;max-width:100%}.fmlink .notes{flex:1 1 100%;margin:0}
 </style>
 
 </head>
@@ -372,6 +373,7 @@ table.fmt.list td.lab{min-width:280px}.small{font-size:.8rem}.seg.mini button{pa
       <div class="eyebrow" id="fmE"></div>
       <h2 id="fmH"></h2>
       <p class="notes" style="margin:0 0 10px">This is Litus Financial Model V11 Fixed v3 itself: every sheet and formula of the Excel file runs in this page, so loans, debt, interest, grants, pilots, testing, battery recycling, people, tax and the GOE v4 plant model give the same numbers as the file. Change any input and the whole model recalculates. Your changes are saved in your workspace; the Excel file is not changed.</p>
+      <div class="fmlink"><label for="fmLink">Clients in the model</label><select id="fmLink"></select><p class="notes" id="fmLinkNote"></p></div>
       <div class="fmbar"><nav class="tabs" id="fmTabs" aria-label="Financial model view">
         <button data-t="sum" class="on">Summary</button><button data-t="is">Income statement</button><button data-t="cf">Cash flow</button><button data-t="bs">Balance sheet</button>
         <span class="tsep">Inputs:</span><button data-t="opp">Opportunities</button><button data-t="key">Key assumptions</button><button data-t="pil">Pilots &amp; testing</button><button data-t="gr">Grants &amp; battery</button><button data-t="loan">Loans &amp; debt</button><button data-t="ppl">People</button></nav>
@@ -386,7 +388,7 @@ table.fmt.list td.lab{min-width:280px}.small{font-size:.8rem}.seg.mini button{pa
       <div class="kpis" id="finK"></div>
       <div class="scnbar">
         <div class="ctl"><label for="scnSel">Scenario</label><select id="scnSel"></select></div>
-        <label class="namechk"><input type="checkbox" class="showNames"> Show client names</label><div class="btns"><button id="scnNew" class="primary">New scenario</button><button id="scnEdit">Edit scenario</button><button id="scnDel" class="danger">Delete scenario</button></div>
+        <label class="namechk"><input type="checkbox" class="showNames"> Show client names</label><div class="btns"><button id="scnUseFm" title="Run section 2, the financial model, with the clients of this scenario">Use in financial model</button><button id="scnNew" class="primary">New scenario</button><button id="scnEdit">Edit scenario</button><button id="scnDel" class="danger">Delete scenario</button></div>
       </div>
       <form id="scnForm" class="box cform" novalidate hidden>
         <h3 id="scnTitle">New scenario</h3>
@@ -407,9 +409,9 @@ table.fmt.list td.lab{min-width:280px}.small{font-size:.8rem}.seg.mini button{pa
     <section class="panel" id="finResults" aria-label="Litus totals">
       <div class="grid2">
         <div class="box"><h3>Litus revenue by client ($M)</h3><div class="legend" id="finLg"></div><svg class="chart" id="finC1" role="img" aria-label="Litus revenue by client and year"></svg></div>
-        <div class="box"><h3>Litus free cash flow ($M)</h3><div class="legend"><span><i class="sq" style="background:var(--c2)"></i>Cash in</span><span><i class="sq" style="background:var(--bad)"></i>Cash out</span><span><i class="ln" style="border-color:var(--head)"></i>Cumulative</span></div><svg class="chart" id="finC2" role="img" aria-label="Litus free cash flow and cumulative cash by year"></svg></div>
+        <div class="box"><h3 id="finC2t">Litus free cash flow ($M)</h3><div class="legend"><span><i class="sq" style="background:var(--c2)"></i>Cash in</span><span><i class="sq" style="background:var(--bad)"></i>Cash out</span><span><i class="ln" style="border-color:var(--head)"></i>Cumulative</span></div><svg class="chart" id="finC2" role="img" aria-label="Litus free cash flow and cumulative cash by year"></svg></div>
       </div>
-      <div class="box"><h3>Litus by year (US$M)</h3><div class="tablewrap"><table id="finTab"></table></div></div>
+      <div class="box"><div class="boxhead"><h3>Litus by year (US$M)</h3><label class="namechk"><input type="checkbox" id="finLoans"> Include the rest of section 2: loans, grants, pilots, testing, equity</label></div><div class="tablewrap"><table id="finTab"></table></div><p class="notes" id="finLoanNote" style="margin:8px 0 0"></p></div>
       <div class="box">
         <div class="boxhead"><div><h3>Build timeline, all clients in this scenario</h3><p class="notes" style="margin:4px 0 0" id="tlSub"></p></div><div class="callout"><b id="tlPeak"></b><span id="tlPeakS">Most modules under construction at once</span></div></div>
         <div class="gantt"><svg id="tlGantt" role="img" aria-label="Build and production timeline for every client, by batch"></svg></div>
@@ -550,14 +552,17 @@ const fmEdits=()=>{if(!S.fm||typeof S.fm!=="object")S.fm={};if(!S.fm.edits||type
 const fmKey=(s,a)=>s+"!"+a;
 const fmSplitKey=k=>{const i=k.lastIndexOf("!");return [k.slice(0,i),k.slice(i+1)];};
 function fmA(s,a){return HF.simpleCellAddressFromString(a,HF.getSheetId(s));}
-function fmOrig(s,a){const [c,r]=splitA(a);const g=FM_WB.sheets[s];if(!g||!g[r-1])return null;const v=g[r-1][colN(c)-1];return v===undefined?null:v;}
+function fmOrig(s,a){const lk=s+"!"+a;if(typeof FM_LINK_OV!=="undefined"&&lk in FM_LINK_OV)return FM_LINK_OV[lk];const [c,r]=splitA(a);const g=FM_WB.sheets[s];if(!g||!g[r-1])return null;const v=g[r-1][colN(c)-1];return v===undefined?null:v;}
 const fmIsF=(s,a)=>{const o=fmOrig(s,a);return typeof o==="string"&&o.startsWith("=");};
 function fmV(s,a){if(!HF)return NaN;try{const v=HF.getCellValue(fmA(s,a));return (v!==null&&typeof v==="object")?NaN:v;}catch(e){return NaN;}}
 const fmN=(s,a)=>{const v=fmV(s,a);return typeof v==="number"?v:0;};
 function fmInit(){
   if(HF)return true;
   if(typeof HyperFormula==="undefined"){fmErr="The calculation engine didn't load (it comes from cdn.jsdelivr.net). Check the connection and reload the page.";return false;}
-  try{HF=HyperFormula.buildFromSheets(FM_WB.sheets,{licenseKey:"gpl-v3"});fmApplyEdits();return true;}
+  try{HF=HyperFormula.buildFromSheets(FM_WB.sheets,{licenseKey:"gpl-v3"});FM_LINK_OV={};FM_LINK_INFO=null;
+    const lid=fmLinkActive();FM_SIG=fmLinkSig();
+    if(lid){try{fmApplyLink(fmPlan(fmLinkClients(lid)));}catch(e){fmErr="The scenario couldn't be linked: "+e.message;HF=null;return false;}}
+    fmApplyEdits();return true;}
   catch(e){fmErr="The model couldn't be built: "+e.message;HF=null;return false;}
 }
 function fmApplyEdits(){if(!HF)return;const E=fmEdits();HF.batch(()=>{for(const [k,v] of Object.entries(E)){const [s,a]=fmSplitKey(k);try{HF.setCellContents(fmA(s,a),[[v]]);}catch(e){delete E[k];}}});}
@@ -642,9 +647,12 @@ function fmList(items){return `<table class="fmt list"><tbody>`+items.map(([s,a,
   return `<tr><td class="lab">${esc(l)}</td><td class="${ed?"ed":""}" title="${esc(s+" "+a)}"><input class="fmin" data-k="${esc(k)}" value="${typeof v==="number"?+v.toPrecision(12):""}" inputmode="decimal"></td><td class="muted small">${esc(s)} ${a}</td></tr>`;}).join("")+"</tbody></table>";}
 function renderFm(){
   const box=$("fmBody");
+  if(HF&&fmLinkSig()!==FM_SIG)HF=null;
   if(!fmInit()){box.innerHTML=`<div class="empty">${esc(fmErr)}</div>`;$("fmH").textContent="Financial model";return;}
   const K=fmKpis(),nE=Object.keys(fmEdits()).length;
-  $("fmE").textContent=`${FM_FILE.toUpperCase()} · RECALCULATED IN THE PAGE · ${nE?nE+" CHANGED INPUT"+(nE>1?"S":""):"SAME AS THE EXCEL FILE"}`;
+  const lid=fmLinkActive();$("fmLink").innerHTML=fmLinkOptions();$("fmLink").value=lid;
+  $("fmE").textContent=`${FM_FILE.toUpperCase()} · RECALCULATED IN THE PAGE · ${lid?"CLIENTS FROM "+fmLinkName(lid).toUpperCase():"EXCEL CLIENTS"}${nE?" · "+nE+" CHANGED INPUT"+(nE>1?"S":""):lid?"":" · SAME AS THE EXCEL FILE"}`;
+  $("fmLinkNote").textContent=lid?`Linked: ${FM_LINK_INFO?FM_LINK_INFO.n:0} clients. Their modules, build timing, ppm and deal terms come from this scenario and run through the Excel model's own module rows. Loans, people rules, pilots, grants and corporate costs stay as in the Excel file.${FM_LINK_INFO&&FM_LINK_INFO.dropped.length?" Not included (no free module block): "+FM_LINK_INFO.dropped.join(", ")+".":""}`:"The clients and timing are the Excel file's. Pick a scenario to run the model with its clients instead.";
   $("fmH").innerHTML=`2031: revenue <span>US$${K.rev[4].toFixed(1)}M</span>, EBITDA <span>US$${K.eb[4].toFixed(1)}M</span>; lowest cash <span>US$${K.minC.toFixed(1)}M</span> (${K.minY})`;
   $("fmReset").disabled=!nE;$("fmReset").textContent=nE?`Reset ${nE} change${nE>1?"s":""} to the Excel values`:"No changes from the Excel file";
   document.querySelectorAll("#fmTabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===fmTab));
@@ -660,6 +668,8 @@ function renderFm(){
   else if(fmTab==="cf")h=`<div class="box"><h3>Cash flow (C$ '000), Cash Flow sheet</h3><div class="tablewrap">${fmGrid({sheet:"Cash Flow",rows:[...Array(29)].map((_,i)=>i+6),cols:C5,hdr:Y5,labelCols:["B"],bold:[16,30,32,34]})}</div><p class="notes">Quarterly detail is on the Cashflow sheet of the Excel file; loans and repayments come from CAPEX &amp; Loans.</p></div>`;
   else if(fmTab==="bs"){const chk=C5.map(c=>fmN("Bal Sheet",c+"14")-fmN("Bal Sheet",c+"36"));
     h=`<div class="box"><h3>Balance sheet (C$ '000), Bal Sheet sheet</h3><div class="tablewrap">${fmGrid({sheet:"Bal Sheet",rows:[...Array(32)].map((_,i)=>i+5),cols:C5,hdr:Y5,labelCols:["A","B"],bold:[14,27,35,36]})}</div><p class="notes">Check, total assets minus total liabilities and equity: ${chk.map(v=>Math.abs(v)<0.5?"0":fmFmt(v)).join(", ")}.</p></div>`;}
+  else if(fmTab==="opp"&&lid)h=`<div class="box"><h3>Clients in the model: ${esc(fmLinkName(lid))}</h3><p class="notes">Each client has its own plant economics block: a copy of the Excel slot formulas at the ppm of that client (Plant Economics and Assumptions, from column BH). Modules enter service on the section 3 build schedule; as in the Excel file, a module earns half a year in its first year. Litus capex is spent in the build months and depreciated over 10 years.</p><div class="tablewrap">${fmLinkTable()}</div></div>
+    <div class="box"><h3>Module build plan (Revenue and Cost rows 52 and 53)</h3><div class="tablewrap">${fmGrid({sheet:"Revenue and Cost",rows:[52,53],cols:["D","E","F","G","H"],hdr:Y5,labelCols:["B"]})}</div></div>`;
   else if(fmTab==="opp")h=`<div class="box"><h3>Commercial opportunities in the model</h3><p class="notes">The model has six opportunity slots. The module count, build years and who builds are set by the Revenue and Cost sheet structure; the brine concentration (ppm) and the label can be changed here. Choose a pool client to copy its opportunity code and ppm into a slot. Plant values per tonne and capex come from the GOE v4 plant model sheets.</p><div class="tablewrap">${fmSlotTable()}</div></div>
     <div class="box"><h3>Module build plan (Revenue and Cost rows 52 and 53)</h3><div class="tablewrap">${fmGrid({sheet:"Revenue and Cost",rows:[52,53],cols:["D","E","F","G","H"],hdr:Y5,labelCols:["B"]})}</div></div>`;
   else if(fmTab==="key")h=`<div class="box"><h3>Key assumptions</h3><p class="notes">Type a new value and press Enter. Changed cells are highlighted; clear a cell to return it to the Excel value. Corporate tax is 23% inside the Model sheet formulas and isn't an input.</p>${fmList(FM_KEY_INPUTS)}</div>`;
@@ -679,9 +689,114 @@ function renderFm(){
       fmEdits()[fmKey(PEA,sl.x+"9")]=c.ppm;HF.setCellContents(fmA(PEA,sl.x+"9"),[[c.ppm]]);});update();});
 }
 function bindFm(){
+  $("fmLink").onchange=()=>{fmSetLink($("fmLink").value);update();};
   $("fmTabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{fmTab=b.dataset.t;renderFm();});
   $("fmReset").onclick=()=>{fmRestoreAll();update();};
 }
+
+// ===== Section 2 link: run the financial model with the clients of a section 3 scenario =====
+// Default: the Excel file exactly. Linked: the scenario's clients are written into the model's own module rows
+// (Revenue and Cost), one plant economics block per client (copy of the Excel slot 3 block at the client's ppm),
+// Litus capex and depreciation (CAPEX & Loans rows 9 and 44), module counts (Revenue and Cost rows 52, 53; Model row 5)
+// and active sites (People Plan row 132). Everything else (loans, people, tax, cash, balance sheet) is the Excel model.
+let FM_LINK_OV={},FM_LINK_INFO=null;
+const FM_PEA="Plant Economics and Assumptions",FM_RC="Revenue and Cost",FM_CX="CAPEX & Loans";
+const FM_YRS=[2027,2028,2029,2030,2031];
+const FM_RC_REV=["D","E","F","G","H"],FM_RC_COST=["K","L","M","N","O"];
+const FM_CX_Q=[["E","F","G","H"],["K","L","M","N"],["Q","R","S","T"],["W","X","Y","Z"],["AC","AD","AE","AF"]];
+const FM_MD_Q=[["D","E","F","G"],["J","K","L","M"],["P","Q","R","S"],["V","W","X","Y"],["AB","AC","AD","AE"]];
+const FM_SLOT_SRC={c0:colN("X"),c1:colN("AD"),r0:1,r1:82},FM_SLOT_AT=colN("BH");   // scenario blocks start at column BH, 7 columns each
+const fmQ=s=>"'"+s+"'";
+const fmLinkId=()=>(S.fm&&S.fm.link)||"";
+function fmLinkName(id){if(id==="pool")return "All clients in the pool";const s=SC.find(x=>x.id===id);return s?s.name:"";}
+function fmLinkClients(id){if(id==="pool")return CL.slice();const s=SC.find(x=>x.id===id);return s?CL.filter(c=>s.clients.includes(c.id)):[];}
+// Revenue and Cost module blocks, read from the Excel layout
+function fmRcBlocks(){const g=FM_WB.sheets[FM_RC],B=[];
+  for(let r=54;r<=265;r++){const b=g[r-1]&&g[r-1][1];if(typeof b==="string"&&/^Module \d+$/.test(b.trim()))B.push(r);}
+  return B.map((r,i)=>{const end=(i+1<B.length?B[i+1]:266)-1,start=i===0?r-1:r,rows={};
+    for(let k=start;k<=end;k++){const c=String((g[k-1]||[])[2]||"").trim(),j=String((g[k-1]||[])[9]||"").trim();
+      if(c)rows["c:"+c]=rows["c:"+c]||k;if(j)rows["j:"+j]=rows["j:"+j]||k;}
+    return {rev:r,start,end,rows};});}
+// plan from a scenario: per client, the year each module enters service and the quarter its capex is spent (section 3 build schedule)
+function fmPlan(clients){return clients.map(c=>{const x=runClient(c),r=x.r,mods=[];
+  r.batches.forEach(b=>{for(let i=0;i<b.mods;i++){const prod=x.off+b.month+3,cq=[[x.off+b.month-1,0.475],[x.off+b.month,0.525]].map(([m,f])=>[Math.floor(m/3),f]);
+    mods.push({y:2027+Math.floor(prod/12),capex:cq});}});
+  const rate=FM_YRS.map((y,i)=>{let roy=0,rev=0;r.M.forEach(m=>{const a=m.m-1+x.off;if(Math.floor(a/12)===i){roy+=m.roy;rev+=m.rev;}});return rev>0?roy/rev:c.bpo/100;});
+  return {code:c.ref||c.name,name:c.name,opt:c.opt,ppm:+c.ppm,capexMult:(+c.capex||1.0177)/1.0177,lic:(+c.lic||0)*1e6,mkt:c.opt===1?0:clientMkt(c)/100,rate,mods};});}
+function fmApplyLink(plan){
+  FM_LINK_OV={};const OV=FM_LINK_OV,set=(s,a,v)=>{OV[fmKey(s,a)]=v;};
+  const blocks=fmRcBlocks(),g=FM_WB.sheets[FM_RC],peaId=HF.getSheetId(FM_PEA);
+  // partner clients need a block with a marketing fee row; Litus clients take the next free block
+  const free=blocks.map((b,i)=>i),use=[],dropped=[];
+  [...plan.filter(p=>p.opt!==1),...plan.filter(p=>p.opt===1)].forEach(p=>{const j=free.findIndex(i=>p.opt===1||blocks[i].rows["c:Marketing fee"]);
+    if(j<0){dropped.push(p);return;}p.blk=blocks[free[j]];free.splice(j,1);use.push(p);});
+  use.sort((a,b)=>a.blk.rev-b.blk.rev);
+  // 1. one plant economics block per client (copy of the slot 3 block, ppm set to the client's)
+  HF.copy({start:{sheet:peaId,col:FM_SLOT_SRC.c0-1,row:FM_SLOT_SRC.r0-1},end:{sheet:peaId,col:FM_SLOT_SRC.c1-1,row:FM_SLOT_SRC.r1-1}});
+  use.forEach((p,i)=>{p.col0=FM_SLOT_AT+7*i;HF.paste({sheet:peaId,col:p.col0-1,row:FM_SLOT_SRC.r0-1});});
+  const pc=(p,k)=>colL(p.col0+k);   // k: 0 label, 1 per tonne, 2 per year, 5 media column
+  use.forEach(p=>{set(FM_PEA,pc(p,0)+"5","Opportunity ID - "+p.code);set(FM_PEA,pc(p,1)+"5",p.mods.length);set(FM_PEA,pc(p,1)+"9",p.ppm);});
+  // 2. clear every module block and write one block per client
+  for(let r=54;r<=265;r++){[...FM_RC_REV,"I",...FM_RC_COST].forEach(c=>{const v=(g[r-1]||[])[colN(c)-1];if(v!==null&&v!==undefined&&v!=="")set(FM_RC,c+r,null);});
+    const a=(g[r-1]||[])[0];if(a!==null&&a!==undefined&&a!=="")set(FM_RC,"A"+r,null);}
+  const PE=(p,k,row)=>`${fmQ(FM_PEA)}!$${pc(p,k)}$${row}`;
+  const newY=FM_YRS.map(()=>0),newL=FM_YRS.map(()=>0),newP=FM_YRS.map(()=>0);
+  use.forEach((p,i)=>{const b=p.blk,R=b.rows,cnt=FM_YRS.map(y=>p.mods.filter(m=>m.y===y).length),full=FM_YRS.map(y=>p.mods.filter(m=>m.y<y).length);
+    cnt.forEach((n,k)=>{newY[k]+=n;(p.opt===1?newL:newP)[k]+=n;});
+    const w=k=>full[k]+cnt[k]/2,rv=b.rev;
+    set(FM_RC,"A"+b.start,"Opportunity ID - "+p.code);
+    FM_RC_REV.forEach((c,k)=>{if(!w(k))return;set(FM_RC,c+rv,`=${PE(p,2,27)}*${w(k)}`);});
+    if(p.opt===1){if(R["c:Revenue Share"])FM_RC_REV.forEach((c,k)=>{if(w(k))set(FM_RC,c+R["c:Revenue Share"],`=${c}${rv}*$B$45`);});
+      if(R["c:Capex"])set(FM_RC,"I"+R["c:Capex"],`=${PE(p,2,23)}*${p.mods.length}*${p.capexMult}`);
+      const reag=`SUM(${PE(p,2,34)}:${PE(p,2,38)})`;
+      FM_RC_COST.forEach((c,k)=>{if(cnt[k]||full[k]){
+        if(R["j:Cost for Nanomaterials"])set(FM_RC,c+R["j:Cost for Nanomaterials"],`=$K$49*${cnt[k]}+$K$50*${full[k]}`);
+        const rr=R["j:Reagent, Utilities & Post processing"];if(rr)set(FM_RC,c+rr,`=${reag}*${cnt[k]/2}+(${reag}+${PE(p,2,21)}*'PE CAPEX Forecast'!$R$1)*${full[k]}`);}});}
+    else{const first=FM_YRS.findIndex((y,k)=>cnt[k]>0);
+      if(first>=0&&p.lic&&R["c:Technology License Fee"])set(FM_RC,FM_RC_REV[first]+R["c:Technology License Fee"],p.lic);
+      FM_RC_REV.forEach((c,k)=>{if(!w(k))return;
+        if(R["c:Revenue Share"])set(FM_RC,c+R["c:Revenue Share"],`=${c}${rv}*${+p.rate[k].toFixed(6)}`);
+        if(R["c:Operation labor"])set(FM_RC,c+R["c:Operation labor"],`=${PE(p,2,30)}*${w(k)}`);
+        if(R["c:Maintenance - Nanomaterial"])set(FM_RC,c+R["c:Maintenance - Nanomaterial"],`=${PE(p,2,33)}*${w(k)}`);
+        if(R["c:Marketing fee"]&&p.mkt)set(FM_RC,c+R["c:Marketing fee"],`=${c}${rv}*${p.mkt}`);});
+      FM_RC_COST.forEach((c,k)=>{if((cnt[k]||full[k])&&R["j:Cost for Nanomaterials"])set(FM_RC,c+R["j:Cost for Nanomaterials"],`=$K$49*${cnt[k]}+${PE(p,5,49)}*${full[k]}`);});}});
+  FM_RC_REV.forEach(c=>set(FM_RC,c+"271",`=SUM(${c}55:${c}265)-SUMIF($C$55:$C$265,"Plant Gross Revenue",${c}$55:${c}$265)`));
+  FM_RC_REV.forEach((c,k)=>{set(FM_RC,c+"52",newP[k]);set(FM_RC,c+"53",newL[k]);});
+  // 3. Litus modular capex by quarter (row 9) and its depreciation (row 44, 10 years straight line); units 2 to 20 cleared
+  const capQ=new Array(20).fill(null).map(()=>[]);
+  use.filter(p=>p.opt===1).forEach(p=>p.mods.forEach(m=>m.capex.forEach(([q,f])=>{if(q>=0&&q<20)capQ[q].push(`${PE(p,2,23)}*${+(f*p.capexMult).toFixed(6)}`);})));
+  const QC=FM_CX_Q.flat();
+  for(let r=9;r<=28;r++)QC.forEach(c=>set(FM_CX,c+r,null));
+  for(let r=44;r<=63;r++)QC.forEach(c=>set(FM_CX,c+r,null));
+  QC.forEach((c,q)=>{if(capQ[q].length)set(FM_CX,c+"9",`=(${capQ[q].join("+")})*${fmQ(FM_RC)}!$B$278`);
+    set(FM_CX,c+"44",(q?`=${QC[q-1]}44+`:"=")+`${c}9/$C$9/4`);});
+  // 4. Model row 5: modules entering service by quarter (display only, the model spreads revenue by fixed shares)
+  const mq=new Array(20).fill(0);use.forEach(p=>p.mods.forEach(m=>{const k=m.y-2027;if(k>=0&&k<5)mq[k*4+1]+=1;}));
+  FM_MD_Q.flat().forEach((c,q)=>set("Model",c+"5",mq[q]));
+  // 5. People Plan: active sites from the scenario clients (same COUNTIFS rule, new table in AA122:AC)
+  const sm={};use.forEach(p=>{const k=p.mods.length?Math.min(...p.mods.map(m=>m.y)):9999;const s=sm[p.code];if(!s||k<s[1])sm[p.code]=[p.code,k,p.opt===1?"Litus":"Partner"];});
+  const sites=Object.values(sm);   // one site per opportunity code
+  const r1=121+Math.max(1,sites.length);
+  set("People Plan","AA121","Scenario opportunity");set("People Plan","AB121","First year in service");set("People Plan","AC121","Built by");
+  sites.forEach((s,i)=>{set("People Plan","AA"+(122+i),s[0]);set("People Plan","AB"+(122+i),s[1]);set("People Plan","AC"+(122+i),s[2]);});
+  ["H","I","J","K","L","M"].forEach(c=>set("People Plan",c+"132",`=COUNTIFS($AB$122:$AB$${r1},"<="&(${c}$128+$F$119),$AC$122:$AC$${r1},IF($F$118=1,"*","Litus"))`));
+  HF.batch(()=>{for(const [k,v] of Object.entries(OV)){const [s,a]=fmSplitKey(k);try{HF.setCellContents(fmA(s,a),[[v]]);}catch(e){}}});
+  FM_LINK_INFO={n:use.length,dropped:dropped.map(p=>p.code),plan:use,newL,newP};
+}
+function fmLinkActive(){const id=fmLinkId();return id&&fmLinkClients(id).length?id:"";}
+
+function fmLinkSig(){const id=fmLinkActive();if(!id)return "";
+  return id+"|"+JSON.stringify(fmLinkClients(id).map(c=>[c.id,c.ref,c.name,c.ppm,c.opt,c.mode,c.mods,c.flow,c.year,c.q,c.bpo,c.apo,c.lic,c.mkt,c.capex,c.bbl,c.price,c.tax,c.lease,c.leaseLow,c.thr,c.naoh,c.margin]))+"|"+[S.bbl,S.price,S.tax,S.capex,S.lease,S.leaseLow,S.thr,S.naohAdj,S.margin].join(",");}
+let FM_SIG="";
+function fmSetLink(id){if(!S.fm||typeof S.fm!=="object")S.fm={};S.fm.link=id||"";HF=null;FM_LINK_OV={};FM_LINK_INFO=null;FM_SIG="";}
+function fmLinkOptions(){const id=fmLinkId();
+  return `<option value="">Excel file (default)</option><option value="pool">All clients in the pool (${CL.length})</option>`+
+    SC.map(s=>`<option value="${s.id}">Scenario: ${esc(s.name)}</option>`).join("");}
+function fmLinkTable(){const I=FM_LINK_INFO;if(!I)return "";
+  return `<table class="fmt"><thead><tr><th class="lab">Client</th><th>Built by</th><th>Modules</th><th>Brine ppm</th>${FM_YRS.map(y=>`<th>In service ${y}</th>`).join("")}<th>t LCE / module / yr</th><th>Revenue / module / yr</th><th>Capex / module</th></tr></thead><tbody>`+
+    I.plan.map(p=>{const c=CL.find(x=>(x.ref||x.name)===p.code)||{name:p.code,ref:p.code},ty=FM_YRS.map(y=>p.mods.filter(m=>m.y===y).length);
+      return `<tr><td class="lab">${esc(dn(c))}</td><td>${p.opt===1?"Litus builds (95%)":"Partner builds"}</td><td>${p.mods.length}</td><td>${p.ppm}</td>${ty.map(n=>`<td>${n||"–"}</td>`).join("")}<td>${fmFmt(fmN(FM_PEA,colL(p.col0+1)+"12"))}</td><td>${fmM(fmN(FM_PEA,colL(p.col0+2)+"27"))}</td><td>${fmM(fmN(FM_PEA,colL(p.col0+2)+"23")*p.capexMult)}</td></tr>`;}).join("")+
+    `<tr class="b"><td class="lab">Total</td><td></td><td>${I.plan.reduce((s,p)=>s+p.mods.length,0)}</td><td></td>${FM_YRS.map((y,k)=>`<td>${I.newL[k]+I.newP[k]||"–"}</td>`).join("")}<td></td><td></td><td></td></tr></tbody></table>`;}
 
 const OPT_DEF={1:{bpo:5,apo:5,lic:0,mkt:0},2:{bpo:5,apo:25,lic:4,mkt:2}};
 const DEF={p1:100,p2:230,p3:350,opt:2,o1:{...OPT_DEF[1]},o2:{...OPT_DEF[2]},bpo:5,apo:25,lic:4,mkt:2,tax:23,lease:1100,leaseLow:750,thr:230,naohAdj:true,margin:10,price:20000,bbl:5177.36,site:50000,y0:2027,q0:1,capex:"1",disc:8,showF:true,showP:true,corp:0,corpOn:true,corpY:null,sec:"plant"};
@@ -843,6 +958,7 @@ function buildPanel(f){
 }
 function update(){
   document.querySelectorAll(".showNames").forEach(cb=>cb.checked=!!S.showNames);
+  if($("finLoans"))$("finLoans").checked=S.finLoans!==false;
   save();fillLoad();
   compute();legends();
   $("fmixbox").hidden=!S.showF;$("pmixbox").hidden=!S.showP;
@@ -1088,13 +1204,42 @@ function ovrText(c){const L={bbl:v=>`${(+v).toLocaleString("en-US")} bbl/day per
 const calAbs=a=>MONS[(a-1)%12]+" "+(2027+Math.floor((a-1)/12));
 const CORP_V10_CAD=[3014.40225,6734.35325,10154.79955,13874.94215,17129.00355]; // Model row 39, C$ '000, Litus Financial Model Final 091126 (field engineers linked to sites and modules; unchanged by GOE v4)
 const corpModel=()=>CORP_V10_CAD.map(v=>Math.round(v/1.34)/1000);                // US$M
-const corpYears=()=>{const y=corpModel();return [...Array(FIN_YEARS)].map((_,j)=>(+y[Math.min(j,4)]||0)*1e6);}; // always the financial model values (box hidden)
+// the rest of the financial model, read live from section 2 (with the workspace changes): C$'000 by year, converted to US$
+function fmReady(){if(typeof HyperFormula==="undefined")return false;if(HF&&fmLinkSig()!==FM_SIG)HF=null;return fmInit();}
+function modelYears(){const Z=[...Array(FIN_YEARS)].fill(0);if(!fmReady())return {ok:false};
+  const fx=fmN("ASSUMPTIONS","C15")||1.34,MC=["H","N","T","Z","AF"],RC=["K","L","M","N","O"],CC=["C","D","E","F","G"],XC=["I","O","U","AA","AG"];
+  const m=r=>MC.map(c=>fmN("Model",c+r)),rc=r=>RC.map(c=>fmN("Revenue and Cost",c+r)/1000),cf=r=>CC.map(c=>fmN("Cash Flow",c+r));
+  const sumR=(rows,f)=>[0,1,2,3,4].map(k=>rows.reduce((s,r)=>s+f(r)[k],0));
+  const loanDraw=XC.map(c=>[80,81,82,83,84].reduce((s,r)=>s+fmN(FM_CX,c+r),0)/1000),loanInt=XC.map(c=>[94,95,96,97,98].reduce((s,r)=>s+fmN(FM_CX,c+r),0)/1000);
+  const ext=(a,flat)=>[...Array(FIN_YEARS)].map((_,j)=>(j<5?a[j]:flat?a[4]:0)*1000/fx);
+  const corp=m(39),tp=[0,1,2,3,4].map(k=>m(8)[k]+m(9)[k]-rc(293)[k]-rc(294)[k]),eb=[0,1,2,3,4].map(k=>m(11)[k]+m(13)[k]-rc(295)[k]-rc(299)[k]);
+  const capO=sumR([54,56,57,58,59,60],m),fin=[0,1,2,3,4].map(k=>cf(22)[k]+cf(23)[k]-cf(28)[k]-loanDraw[k]),intO=[0,1,2,3,4].map(k=>m(44)[k]-loanInt[k]);
+  return {ok:true,corp:ext(corp,true),tp:ext(tp,true),eb:ext(eb,true),grants:ext(m(12),false),capO:ext(capO,false),fin:ext(fin,false),intO:ext(intO,false)};}
+const corpYears=()=>{const M=modelYears();if(M.ok)return M.corp;const y=corpModel();return [...Array(FIN_YEARS)].map((_,j)=>(+y[Math.min(j,4)]||0)*1e6);}; // section 2 values
+// loans from section 2 (CAPEX & Loans rows 80 to 84, with the workspace changes): drawn in their quarter, interest every quarter
+// from the draw quarter at the loan rate (rows 94 to 98, same as the Excel file), repaid in full at the end of the term (column C)
+function fmInputNum(s,a){const k=s+"!"+a,E=fmEdits();const v=(k in E)?E[k]:fmOrig(s,a);return typeof v==="number"?v:(typeof v==="string"&&v!==""&&!isNaN(+v)?+v:0);}
+function loanYears(){const N=FIN_YEARS*4,draw=new Array(N).fill(0),intr=new Array(N).fill(0),rep=new Array(N).fill(0),QC=FM_CX_Q.flat(),list=[];
+  const fx=fmInputNum("ASSUMPTIONS","C15")||1.34,r1=fmInputNum(FM_CX,"C94");
+  for(let k=0;k<5;k++){const row=80+k,lab=String(fmOrig(FM_CX,"B"+row)||"Loan "+(k+1));
+    const rc=fmOrig(FM_CX,"C"+(94+k)),rate=(typeof rc==="number"||(k===4&&rc!=null&&rc!==""))?fmInputNum(FM_CX,"C"+(94+k)):r1;
+    const tm=parseFloat(String(fmOrig(FM_CX,"C"+row)||"5"))||5,term=Math.round(tm*4);
+    QC.forEach((c,q)=>{const amt=fmInputNum(FM_CX,c+row);if(!amt)return;list.push({lab,amt,q,rate,term});draw[q]+=amt;
+      for(let j=q;j<Math.min(N,q+term);j++)intr[j]+=amt*rate/4;if(q+term<N)rep[q+term]+=amt;});}
+  const yr=a=>[...Array(FIN_YEARS)].map((_,j)=>a.slice(j*4,j*4+4).reduce((s,v)=>s+v,0)/fx);
+  return {draw:yr(draw),int:yr(intr),rep:yr(rep),list,fx};}
 function totals(runs){const cy=corpYears(),corp=cy;
   const T={};["rev","ebitda","capex","tax","fcf","modsL","modsP"].forEach(k=>T[k]=new Array(FIN_YEARS).fill(0).map((_,j)=>runs.reduce((s,x)=>s+x.Y[k][j],0)));
   T.ebitda=T.ebitda.map((v,j)=>v-cy[j]);T.fcf=T.fcf.map((v,j)=>v-cy[j]);
+  const LN=loanYears(),on=S.finLoans!==false,MY=modelYears(),Z0=new Array(FIN_YEARS).fill(0),g=k=>on&&MY.ok?MY[k]:Z0;
+  T.tp=g("tp");T.eb=g("eb");T.grants=g("grants");T.capO=g("capO");T.finO=g("fin");T.intO=g("intO");T.capexC=T.capex.slice();
+  T.ebitda=T.ebitda.map((v,j)=>v+T.tp[j]+T.eb[j]+T.grants[j]);T.capex=T.capex.map((v,j)=>v+T.capO[j]);
+  T.fcf=T.fcf.map((v,j)=>v+T.tp[j]+T.eb[j]+T.grants[j]-T.capO[j]);
   let c=0;T.cum=T.fcf.map(v=>c+=v);
+  T.loanDraw=LN.draw;T.loanInt=LN.int;T.loanRep=LN.rep;
+  T.fcfL=T.fcf.map((v,j)=>v+(on?LN.draw[j]-LN.int[j]-LN.rep[j]+T.finO[j]-T.intO[j]:0));let cl=0;T.cumL=T.fcfL.map(v=>cl+=v);T.loansOn=on;T.modelOk=MY.ok;
   const disc=S.disc/100, corpPv=cy.reduce((s,v,j)=>s+v/Math.pow(1+disc,j+0.5),0);
-  return {T,corp,npv:runs.reduce((s,x)=>s+x.npv,0)-corpPv,minCum:Math.min(0,...T.cum)};}
+  return {T,corp,npv:runs.reduce((s,x)=>s+x.npv,0)-corpPv,minCum:Math.min(0,...T.cum),minCumL:Math.min(...T.cumL.slice(0,SHOW_Y)),minCumLY:2027+T.cumL.slice(0,SHOW_Y).indexOf(Math.min(...T.cumL.slice(0,SHOW_Y)))};}
 const curScn=()=>SC.find(s=>s.id===S.scn)||null;
 const inScn=(c,s)=>!s||s.clients.includes(c.id);
 function renderScn(){const sel=$("scnSel");
@@ -1103,15 +1248,15 @@ function renderScn(){const sel=$("scnSel");
 function renderFin(){
   renderScn();
   const pool=CL.map(runClient), scn=curScn(), runs=pool.filter(x=>inScn(x.c,scn));
-  const {T,corp,npv,minCum}=totals(runs), y31=4;
+  const {T,corp,npv,minCum,minCumL,minCumLY}=totals(runs), y31=4, LO=T.loansOn;
   const scnName=scn?scn.name:"All clients";
   $("finE").textContent=`FINANCIAL MODEL · SCENARIO: ${scnName.toUpperCase()} · ${runs.length} OF ${CL.length} CLIENT${CL.length===1?"":"S"} · ${S.tax}% TAX · LI2CO3 $${S.price.toLocaleString("en-US")}/T`;
   $("finH").innerHTML=!CL.length?`Add your first client to build the Litus forecast`:!runs.length?`No clients selected in this scenario: tick clients below or edit the scenario`:`Litus earns <span>${fmM(T.rev[y31])}</span> in 2031 and <span>${fmM(npv)}</span> of NPV in this scenario`;
   const ownMods=Math.max(...T.modsL.slice(0,SHOW_Y)),parMods=Math.max(...T.modsP.slice(0,SHOW_Y));
   $("finK").innerHTML=[[`${fmM(T.rev[y31])}`,"Litus revenue, 2031"],[`${fmM(T.ebitda[y31])}`,"Litus EBITDA, 2031"],
     [fmM(npv),(()=>{const ds=[...new Set(runs.map(x=>clientSet(x.c).disc))];return ds.length<=1?`Litus NPV at ${ds[0]??S.disc}%, ${FIN_YEARS} years`:`Litus NPV, ${FIN_YEARS} years (each client at its own discount rate)`;})(),true],[fmM(minCum),"Peak funding need (lowest cumulative cash)",false,minCum<0],
-    [fmM(T.capex.reduce((s,v)=>s+v,0)),"Capex Litus funds (option 1 clients)"],[`${ownMods} + ${parMods}`,"Modules online by 2036: Litus owned + partner owned"],
-    [fmM(T.cum[SHOW_Y-1]),"Cumulative cash by 2036",false,T.cum[SHOW_Y-1]<0],[fmM(T.rev.reduce((s,v)=>s+v,0)),`Litus revenue over ${FIN_YEARS} years`]]
+    [fmM(T.capex.reduce((s,v)=>s+v,0)),LO?"Capex Litus funds (clients and other)":"Capex Litus funds (option 1 clients)"],[`${ownMods} + ${parMods}`,"Modules online by 2036: Litus owned + partner owned"],
+    ...(LO?[[fmM(minCumL),`Lowest cash after financing (${minCumLY})`,false,minCumL<0],[fmM(T.cumL[SHOW_Y-1]),"Cash by 2036 after financing",false,T.cumL[SHOW_Y-1]<0]]:[[fmM(T.cum[SHOW_Y-1]),"Cumulative cash by 2036",false,T.cum[SHOW_Y-1]<0]]),[fmM(T.rev.reduce((s,v)=>s+v,0)),`Litus revenue over ${FIN_YEARS} years`]]
     .map(([v,l,st,neg])=>`<div class="kpi${st?" strong":""}${neg?" neg":""}"><b>${v}</b><span>${l}</span></div>`).join("");
   // compact client list (manage in section 3)
   $("clientList").innerHTML=CL.length?`<table class="mini"><thead><tr>${scn?"<th>In scenario</th>":""}<th style="text-align:left">Client</th><th>Build</th><th>ppm</th><th>bbl/day</th><th>Starts</th><th>Litus NPV</th></tr></thead><tbody>`+pool.map((x,i)=>{const c=x.c,on=inScn(c,scn);
@@ -1124,14 +1269,19 @@ function renderFin(){
   const colOf=x=>ccol(pool.indexOf(x));
   $("finLg").innerHTML=runs.map(x=>`<span><i class="sq" style="background:${colOf(x)}"></i>${esc(dn(x.c))}</span>`).join("");
   barChart($("finC1"),runs.map(x=>({vals:x.Y.rev.slice(0,SHOW_Y),col:colOf(x)})),null);
-  barChart($("finC2"),[{vals:T.fcf.slice(0,SHOW_Y),col:null}],T.cum.slice(0,SHOW_Y));
+  barChart($("finC2"),[{vals:(LO?T.fcfL:T.fcf).slice(0,SHOW_Y),col:null}],(LO?T.cumL:T.cum).slice(0,SHOW_Y));$("finC2t").textContent=LO?"Litus cash flow after financing ($M)":"Litus free cash flow ($M)";
   const yrs=[...Array(SHOW_Y)].map((_,j)=>2027+j), f1=v=>{const a=v/1e6;return (a<0?"−":"")+Math.abs(a).toFixed(Math.abs(a)>=100?0:1);};
   const line=(lab,arr,cls,fmt)=>`<tr${cls?` class="${cls}"`:""}><td>${lab}</td>${arr.slice(0,SHOW_Y).map(v=>`<td${v<0?' class="neg"':""}>${(fmt||f1)(v)}</td>`).join("")}</tr>`;
   $("finTab").innerHTML=`<thead><tr><th></th>${yrs.map(y=>`<th>${y}</th>`).join("")}</tr></thead><tbody>`+
     line("Modules online, Litus owned",T.modsL,"",v=>v)+line("Modules online, partner owned",T.modsP,"",v=>v)+
     runs.map(x=>line("Revenue, "+esc(dn(x.c)),x.Y.rev,"sub")).join("")+
-    line("Litus revenue",T.rev,"sum")+line("Corporate costs (financial model)",corp.map(v=>-v))+line("EBITDA",T.ebitda)+line("Tax",T.tax.map(v=>-v))+line("Capex",T.capex.map(v=>-v))+
-    line("Free cash flow",T.fcf,"hl")+line("Cumulative cash",T.cum,"sum")+"</tbody>";
+    line("Litus revenue",T.rev,"sum")+line("Corporate costs (section 2)",corp.map(v=>-v))+
+    (LO?line("Testing and pilots, revenue less cost",T.tp)+line("Engineering services and battery recycling, net",T.eb)+line("Grants",T.grants):"")+
+    line("EBITDA",T.ebitda)+line("Tax (clients)",T.tax.map(v=>-v))+line(LO?"Capex, clients":"Capex",T.capexC.map(v=>-v))+(LO?line("Capex, pilot units, lab, IT and office",T.capO.map(v=>-v)):"")+
+    line("Free cash flow",T.fcf,"hl")+line(LO?"Cumulative cash before financing":"Cumulative cash",T.cum,"sum")+
+    (LO?line("Equity raised and convertible debt (section 2)",T.finO)+line("Loans drawn (section 2)",T.loanDraw)+line("Loan interest",T.loanInt.map(v=>-v))+line("Other interest (convertible debt)",T.intO.map(v=>-v))+line("Loan repayments",T.loanRep.map(v=>-v))+
+      line("Cash flow after financing",T.fcfL,"hl")+line("Cumulative cash after financing",T.cumL,"sum"):"")+"</tbody>";
+  const LN=loanYears();$("finLoanNote").textContent=LO?`${T.modelOk?"Pilots, testing, engineering services, battery recycling, grants, other capex, the equity raise and convertible debt are the section 2 values by year (2027 to 2031); after 2031 the operating items stay at their 2031 level and the one off items stop. ":"The section 2 engine is not loaded, so only the loans are included. "}Loans are the section 2 loans (Loans & debt tab, including your changes): ${LN.list.map(l=>`${l.lab} C$${(l.amt/1e6).toFixed(1)}M in ${2027+Math.floor(l.q/4)} Q${l.q%4+1} at ${+(l.rate*100).toFixed(2)}%`).join("; ")}. Interest is paid every quarter from the drawdown quarter, as in the Excel file, and each loan is repaid in full at the end of its term (${[...new Set(LN.list.map(l=>l.term/4))].join(", ")} years). Converted at US$1 = C$${LN.fx}. Interest is shown before any tax saving, and tax is the clients\' tax only.`:"Only the clients and corporate costs are included. Tick the box to add loans, grants, pilots, testing and the rest of section 2.";
   buildTimeline(runs,colOf);
 }
 function buildTimeline(runs,colOf){
@@ -1180,9 +1330,9 @@ function buildTimeline(runs,colOf){
 function renderCmp(pool){const box=$("scnCmp");
   const list=[{id:"",name:"All clients in the pool",clients:CL.map(c=>c.id)},...SC];
   if(!CL.length){box.hidden=true;return;}box.hidden=false;
-  $("scnTab").innerHTML=`<thead><tr><th>Scenario</th><th>Clients</th><th>Modules (Litus + partner)</th><th>Litus revenue 2031</th><th>EBITDA 2031</th><th>Capex Litus funds</th><th>Peak funding need</th><th>Cash by 2036</th><th>Litus NPV</th></tr></thead><tbody>`+
+  $("scnTab").innerHTML=`<thead><tr><th>Scenario</th><th>Clients</th><th>Modules (Litus + partner)</th><th>Litus revenue 2031</th><th>EBITDA 2031</th><th>Capex Litus funds</th><th>Peak funding need</th>${S.finLoans!==false?"<th>Lowest cash after financing</th><th>Cash by 2036 after financing</th>":"<th>Cash by 2036</th>"}<th>Litus NPV</th></tr></thead><tbody>`+
     list.map(s=>{const rs=pool.filter(x=>s.clients.includes(x.c.id)),t=totals(rs),T=t.T;const cur=(s.id||"")===(S.scn||"")||(!curScn()&&!s.id);
-      return `<tr class="${cur?"hl":""}" data-pick="${s.id}"><td>${esc(s.name)}</td><td>${rs.length}</td><td>${Math.max(0,...T.modsL)} + ${Math.max(0,...T.modsP)}</td><td>${fmM(T.rev[4])}</td><td>${fmM(T.ebitda[4])}</td><td>${fmM(T.capex.reduce((a,v)=>a+v,0))}</td><td${t.minCum<0?' class="neg"':""}>${fmM(t.minCum)}</td><td>${fmM(T.cum[SHOW_Y-1])}</td><td>${fmM(t.npv)}</td></tr>`;}).join("")+"</tbody>";
+      return `<tr class="${cur?"hl":""}" data-pick="${s.id}"><td>${esc(s.name)}</td><td>${rs.length}</td><td>${Math.max(0,...T.modsL)} + ${Math.max(0,...T.modsP)}</td><td>${fmM(T.rev[4])}</td><td>${fmM(T.ebitda[4])}</td><td>${fmM(T.capex.reduce((a,v)=>a+v,0))}</td><td${t.minCum<0?' class="neg"':""}>${fmM(t.minCum)}</td>${T.loansOn?`<td${t.minCumL<0?' class="neg"':""}>${fmM(t.minCumL)}</td><td>${fmM(T.cumL[SHOW_Y-1])}</td>`:`<td>${fmM(T.cum[SHOW_Y-1])}</td>`}<td>${fmM(t.npv)}</td></tr>`;}).join("")+"</tbody>";
   $("scnTab").querySelectorAll("[data-pick]").forEach(tr=>tr.onclick=()=>{S.scn=tr.dataset.pick||"";update();});}
 let scnEdit=null;
 function openScn(id){scnEdit=id||null;const s=id?SC.find(x=>x.id===id):{name:`Scenario ${SC.length+1}`,clients:[]};
@@ -1191,6 +1341,7 @@ function openScn(id){scnEdit=id||null;const s=id?SC.find(x=>x.id===id):{name:`Sc
   $("scnForm").hidden=false;$("scnName").focus();}
 function bindScn(){
   $("scnSel").onchange=()=>{S.scn=$("scnSel").value;update();};
+  $("scnUseFm").onclick=()=>{fmSetLink(S.scn||"pool");S.sec="fm";showSec();update();window.scrollTo(0,0);};
   $("scnNew").onclick=()=>openScn(null);
   $("scnEdit").onclick=()=>{if(curScn())openScn(S.scn);};
   $("scnDel").onclick=()=>{const b=$("scnDel");if(!curScn())return;if(b.dataset.armed){SC=SC.filter(s=>s.id!==S.scn);S.scn="";delete b.dataset.armed;b.textContent="Delete scenario";update();}else{b.dataset.armed=1;b.textContent="Confirm delete";setTimeout(()=>{delete b.dataset.armed;b.textContent="Delete scenario";},3000);}};
@@ -1246,9 +1397,10 @@ function formUi(){const m=$("cfMode").value,o=+$("cfOpt").value;$("cfFlowW").hid
   $("cfLblApo").textContent=o===1?"Royalty to client (brine owner) after payout (%)":"Litus royalty after payout (%)";
   const c=readForm(),x=runClient({...c,id:"tmp"});
   $("cfPreview").textContent=`${x.r.nMods} module${x.r.nMods>1?"s":""} (${x.r.batches.map(b=>b.mods).join(" + ")}), first production ${calAbs(x.first)}, full production ${calAbs(x.full)}. Litus revenue at full rate ${fmM(Math.max(...x.Y.rev))} a year; Litus NPV ${fmM(x.npv)}${c.opt===1?`; Litus capex ${fmM(x.capex)}`:""}.`;}
+function bindLoans(){const cb=$("finLoans");cb.checked=S.finLoans!==false;cb.onchange=()=>{S.finLoans=cb.checked;update();};}
 function bindNames(){document.querySelectorAll(".showNames").forEach(cb=>{cb.checked=!!S.showNames;cb.onchange=()=>{S.showNames=cb.checked;update();};});}
 function bindFin(){
-  bindNames();bindScn();bindSave();bindPool();bindFm();
+  bindNames();bindLoans();bindScn();bindSave();bindPool();bindFm();
   $("cfCancel").onclick=closeForm;
   $("cfFromS1").onclick=()=>{OVR.forEach(k=>$(FID[k]).value=S1v(k));formUi();};
   $("cfDelete").onclick=()=>{if(!editId||(CL.find(c=>c.id===editId)||{}).locked)return;CL=CL.filter(c=>c.id!==editId);SC.forEach(s=>s.clients=s.clients.filter(x=>x!==editId));closeForm();update();};
